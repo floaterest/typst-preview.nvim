@@ -2,6 +2,7 @@ local M = {
   opts = {
     debug = false,
     open_cmd = nil,
+    port = 8080,
     invert_colors = 'never',
     follow_cursor = true,
     dependencies_bin = {

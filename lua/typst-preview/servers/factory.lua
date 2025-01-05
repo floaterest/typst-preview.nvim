@@ -28,7 +28,7 @@ local function spawn(path, mode, callback)
     '--control-plane-host',
     '127.0.0.1:0',
     '--static-file-host',
-    '127.0.0.1:0',
+    '127.0.0.1:' .. config.opts.port,
     '--root',
     config.opts.get_root(path),
     config.opts.get_main_file(path),
@@ -111,6 +111,13 @@ local function spawn(path, mode, callback)
     end
   end
   local function read_server(serr, server_output)
+    if server_output and server_output:find('AddrInUse') then
+      print('Port ' .. config.opts.port .. ' is already in use')
+      -- config.opts.port = config.opts.port + 1
+      -- spawn(path, mode, callback)
+      return
+    end
+
     if serr then
       error(serr)
     elseif server_output then
