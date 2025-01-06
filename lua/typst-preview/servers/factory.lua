@@ -10,7 +10,7 @@ local M = {}
 ---@param mode mode
 ---@param callback fun(close: fun(), write: fun(data: string), read: fun(on_read: fun(data: string)), link: string)
 ---Called after server spawn completes
-local function spawn(path, mode, callback)
+local function spawn(path, port, mode, callback)
   local server_stdout = assert(vim.uv.new_pipe())
   local server_stderr = assert(vim.uv.new_pipe())
   local tinymist_bin = config.opts.dependencies_bin['tinymist']
@@ -23,12 +23,8 @@ local function spawn(path, mode, callback)
     '--preview-mode',
     mode,
     '--no-open',
-    '--data-plane-host',
-    '127.0.0.1:0',
-    '--control-plane-host',
-    '127.0.0.1:0',
-    '--static-file-host',
-    '127.0.0.1:' .. config.opts.port,
+    '--host',
+    '127.0.0.1:' .. port,
     '--root',
     config.opts.get_root(path),
     config.opts.get_main_file(path),
@@ -112,9 +108,11 @@ local function spawn(path, mode, callback)
   end
   local function read_server(serr, server_output)
     if server_output and server_output:find('AddrInUse') then
-      print('Port ' .. config.opts.port .. ' is already in use')
-      -- config.opts.port = config.opts.port + 1
-      -- spawn(path, mode, callback)
+      print('Port ' .. port .. ' is already in use')
+      utils.debug('OUTPUT START\n'..server_output..'\nOUTPUT END')
+      vim.defer_fn(function()
+        spawn(path, port + 1, mode, callback)
+      end, 0)
       return
     end
 
@@ -157,8 +155,18 @@ local function spawn(path, mode, callback)
       utils.debug(server_output)
     end
   end
-  server_stdout:read_start(read_server)
-  server_stderr:read_start(read_server)
+  local function read_stderr(err, output)
+    if output then
+      utils.debug('Server stderr: ' .. output)
+    end
+  end
+  local function read_stdout(err, output)
+    if output then
+      utils.debug('Server stdout: ' .. output)
+    end
+  end
+  server_stdout:read_start(read_stdout)
+  server_stderr:read_start(read_stderr)
 end
 
 ---create a new Server
@@ -168,7 +176,7 @@ end
 function M.new(path, mode, callback)
   local read_buffer = ''
 
-  spawn(path, mode, function(close, write, read, link)
+  spawn(path, config.opts.port, mode, function(close, write, read, link)
     ---@type Server
     local server = {
       path = path,
